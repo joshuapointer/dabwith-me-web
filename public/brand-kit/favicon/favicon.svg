@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="dabwith.me favicon">
+  <title>dabwith.me — favicon (simplified for tiny sizes)</title>
+  <defs>
+    <radialGradient id="fv_body" cx="65%" cy="72%" r="65%">
+      <stop offset="0"   stop-color="oklch(80% 0.18 30)"/>
+      <stop offset="0.7" stop-color="oklch(86% 0.08 320)"/>
+      <stop offset="1"   stop-color="oklch(83% 0.06 320)"/>
+    </radialGradient>
+    <radialGradient id="fv_hi" cx="32%" cy="28%" r="36%">
+      <stop offset="0" stop-color="oklch(99% 0.02 320)" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="oklch(99% 0.02 320)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Orb fills full canvas, no halo (won't read at 16px) -->
+  <circle cx="50" cy="50" r="48" fill="url(#fv_body)"/>
+  <circle cx="50" cy="50" r="48" fill="url(#fv_hi)"/>
+  <!-- Bigger, more emphatic eyes for tiny-size legibility -->
+  <ellipse cx="36" cy="50" rx="8.5"  ry="11" fill="oklch(28% 0.04 290)"/>
+  <ellipse cx="64" cy="50" rx="8.5"  ry="11" fill="oklch(28% 0.04 290)"/>
+  <!-- Anchor outline for white-on-white situations -->
+  <circle cx="50" cy="50" r="48" fill="none" stroke="oklch(70% 0.06 320)" stroke-opacity="0.30" stroke-width="0.6"/>
+</svg>

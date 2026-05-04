@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#f7e8eb" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="description" content="dabwith.me — a sleepy little co-pilot for your sesh." />
+<title>dabwith.me — a sleepy little co-pilot for your sesh</title>
+<style>
+:root {
+  --bg:        oklch(97% 0.025 320);
+  --surface:   oklch(99% 0.012 320);
+  --border:    oklch(90% 0.04 320);
+  --muted:     oklch(55% 0.04 300);
+  --fg:        oklch(30% 0.04 300);
+  --accent:    oklch(75% 0.18 30);
+  --accent-deep: oklch(65% 0.20 28);
+
+  --shadow-soft: 0 6px 18px oklch(70% 0.06 320 / 0.18), 0 2px 4px oklch(60% 0.05 320 / 0.10);
+  --shadow-pop:  0 12px 28px oklch(70% 0.10 30 / 0.30), 0 4px 8px oklch(60% 0.10 30 / 0.18);
+  --shadow-orb:  0 30px 60px oklch(70% 0.10 320 / 0.32), 0 10px 22px oklch(60% 0.08 320 / 0.18);
+
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'SF Pro Display', system-ui, sans-serif;
+  --font-body:    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono:    'SF Mono', ui-monospace, Menlo, monospace;
+
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease:   cubic-bezier(.22, 1, .36, 1);
+
+  --safe-top:    env(safe-area-inset-top, 0);
+  --safe-bottom: env(safe-area-inset-bottom, 0);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; }
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 30% 10%, oklch(94% 0.06 320 / 0.55), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 80% 90%, oklch(92% 0.08 30 / 0.40), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 50% 50%, oklch(95% 0.05 165 / 0.30), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--fg); font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  font-size: 16px; line-height: 1.4;
+  min-height: 100dvh; overflow-x: hidden;
+}
+button { font-family: inherit; font-size: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+::selection { background: oklch(85% 0.14 30 / 0.45); color: var(--fg); }
+
+.app {
+  position: relative; display: grid; grid-template-rows: auto 1fr auto;
+  width: 100%; max-width: 560px; min-height: 100dvh; margin: 0 auto;
+  padding: calc(16px + var(--safe-top)) 24px calc(20px + var(--safe-bottom));
+}
+@media (min-width: 760px) { .app { max-width: 720px; padding: 24px 32px 28px; } }
+@media (min-width: 1100px) { .app { max-width: 1180px; padding: 28px 40px 32px; } }
+
+.head { display: flex; align-items: center; justify-content: space-between; gap: 16px; z-index: 5; padding-bottom: 10px; }
+.wordmark { font-family: var(--font-display); font-weight: 600; font-size: 17px; letter-spacing: -0.015em; color: var(--fg); user-select: none; }
+.wordmark .me { color: var(--accent); }
+.steps { display: flex; gap: 6px; align-items: center; }
+.step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 280ms var(--ease), transform 280ms var(--spring); }
+.step-dot.done { background: oklch(82% 0.10 305); }
+.step-dot.current { background: var(--accent); transform: scale(1.4); }
+.head-action {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border);
+  transition: color 220ms var(--ease), background 220ms var(--ease), transform 160ms var(--spring);
+}
+.head-action:hover { color: var(--fg); background: var(--surface); }
+.head-action:active { transform: scale(0.94); }
+
+/* ============================================================
+   Stage — vertical stack: top carousel · center · bottom carousel
+   ============================================================ */
+.stage {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px; min-height: 0; position: relative;
+}
+
+.center-row {
+  display: flex; flex-direction: column;
+  gap: 8px; align-items: stretch; justify-content: center;
+  min-height: 0; padding: 4px 0;
+}
+@media (min-width: 1100px) {
+  .center-row {
+    flex-direction: row; align-items: center; justify-content: center;
+    gap: 36px; padding: 12px 0;
+  }
+  .center-row .orb-cell { flex: 0 0 auto; }
+  .center-row .slot { flex: 1 1 auto; max-width: 520px; }
+}
+
+/* ============================================================
+   Orb — sized smaller during setup, expands during live
+   ============================================================ */
+.orb-cell { display: grid; place-items: center; position: relative; height: clamp(180px, 26vh, 260px); transition: height 520ms var(--ease); }
+.stage.is-live .orb-cell { height: clamp(240px, 38vh, 360px); }
+@media (min-width: 1100px) {
+  .orb-cell { height: clamp(260px, 32vh, 340px); }
+  .stage.is-live .orb-cell { height: clamp(300px, 44vh, 420px); }
+}
+
+.bub {
+  position: relative; width: clamp(160px, 38vw, 220px); aspect-ratio: 1;
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+  --breathe: 4s;
+  animation: bub-float 7s ease-in-out infinite, bub-breathe var(--breathe) ease-in-out infinite;
+  transition: width 520ms var(--ease), filter 600ms var(--ease);
+}
+.stage.is-live .bub { width: clamp(220px, 50vw, 300px); }
+@media (min-width: 1100px) {
+  .bub { width: clamp(220px, 22vw, 300px); }
+  .stage.is-live .bub { width: clamp(280px, 26vw, 360px); }
+}
+.bub:active { animation-play-state: paused; transform: scaleY(0.92) scaleX(1.06); }
+@keyframes bub-float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(0.6deg); } }
+@keyframes bub-breathe { 0%, 100% { filter: brightness(1) saturate(1); } 50% { filter: brightness(1.05) saturate(1.08); } }
+.bub__halo {
+  position: absolute; inset: -24px; border-radius: 50%;
+  background: radial-gradient(circle, var(--halo-color, oklch(85% 0.10 30 / 0.40)), transparent 65%);
+  filter: blur(20px); animation: halo-pulse var(--breathe) ease-in-out infinite; pointer-events: none;
+}
+@keyframes halo-pulse { 0%, 100% { opacity: 0.7; transform: scale(0.95); } 50% { opacity: 1.0; transform: scale(1.04); } }
+.bub__body {
+  position: absolute; inset: 0; border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, oklch(99% 0.02 320 / 0.95), transparent 36%),
+    radial-gradient(circle at 65% 72%,
+      var(--core-color, oklch(80% 0.14 30)) 0%,
+      var(--edge-color, oklch(88% 0.06 320)) 70%,
+      oklch(85% 0.04 320) 100%);
+  box-shadow: inset 0 -10px 24px oklch(70% 0.10 320 / 0.18), inset 0 6px 14px oklch(99% 0.01 320 / 0.6), var(--shadow-orb);
+  transition: background 700ms var(--ease);
+}
+.bub__cheek {
+  position: absolute; width: 14%; height: 9%; border-radius: 50%;
+  background: radial-gradient(ellipse, oklch(80% 0.16 25 / 0.55), transparent 70%);
+  filter: blur(2px); top: 56%; pointer-events: none;
+  transition: opacity 400ms var(--ease);
+}
+.bub__cheek.left { left: 14%; } .bub__cheek.right { right: 14%; }
+.bub.concentrating .bub__cheek { opacity: 0; }
+.bub__face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 14%; padding-top: 8%; pointer-events: none; }
+.bub__eye {
+  width: 12%; aspect-ratio: 1 / 1.3; background: oklch(28% 0.04 290);
+  border-radius: 50%; position: relative; transform-origin: 50% 50%;
+  transition: transform 220ms var(--spring), background 400ms ease, border-radius 220ms ease;
+}
+.bub__eye::after { content: ''; position: absolute; top: 18%; left: 28%; width: 32%; height: 32%; border-radius: 50%; background: oklch(99% 0.005 320 / 0.85); }
+.bub.sleepy .bub__eye { transform: scaleY(0.4); }
+.bub.wide .bub__eye { transform: scale(1.2); }
+.bub.curious .bub__eye { transform: scale(1.15); }
+.bub.eager .bub__eye { transform: scale(1.1); }
+.bub.surprised .bub__eye { transform: scale(1.3); aspect-ratio: 1 / 1; background: oklch(28% 0.04 290); }
+.bub.concentrating .bub__eye { transform: scaleY(0.08); background: oklch(35% 0.04 290); border-radius: 4px; }
+.bub.concentrating .bub__eye::after { display: none; }
+.bub.happy .bub__eye, .bub.tidy .bub__eye {
+  transform: scaleY(1) scaleX(1.2); background: transparent;
+  border-bottom: 2.5px solid oklch(28% 0.04 290);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  height: 14%; aspect-ratio: 1.5 / 1;
+}
+.bub.happy .bub__eye::after, .bub.tidy .bub__eye::after { display: none; }
+.bub.starry .bub__eye { background: transparent; width: 18%; aspect-ratio: 1; border-radius: 0; }
+.bub.starry .bub__eye::before {
+  content: '✦'; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent-deep); font-size: 32px;
+  animation: starry-twinkle 1.4s ease-in-out infinite;
+}
+.bub.starry .bub__eye::after { display: none; }
+.bub.starry .bub__eye:last-child::before { animation-delay: 0.7s; }
+@keyframes starry-twinkle { 0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.95; } 50% { transform: scale(1.18) rotate(15deg); opacity: 1; } }
+.bub.blinking .bub__eye { transform: scaleY(0.05); transition: transform 80ms ease; }
+.bub.blinking .bub__eye::after { display: none; }
+.bub__mouth {
+  position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%);
+  width: 18%; height: 8%;
+  border-bottom: 2px solid oklch(40% 0.04 290);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  opacity: 0; transition: opacity 400ms var(--ease);
+}
+.bub.happy .bub__mouth, .bub.tidy .bub__mouth, .bub.starry .bub__mouth { opacity: 0.7; }
+.bub.surprised .bub__mouth { opacity: 0.7; width: 8%; aspect-ratio: 1; border-radius: 50%; border: 2px solid oklch(40% 0.04 290); height: auto; }
+
+.bub.mood-idle    { --core-color: oklch(85% 0.08 30);  --edge-color: oklch(92% 0.04 320); --halo-color: oklch(85% 0.08 320 / 0.35); }
+.bub.mood-curious { --core-color: oklch(82% 0.12 30);  --edge-color: oklch(90% 0.06 320); --halo-color: oklch(85% 0.10 30 / 0.40); }
+.bub.mood-eager   { --core-color: oklch(80% 0.16 30);  --edge-color: oklch(90% 0.08 320); --halo-color: oklch(80% 0.16 30 / 0.50); }
+.bub.mood-heat    { --core-color: oklch(72% 0.24 32);  --edge-color: oklch(82% 0.20 55);  --halo-color: oklch(75% 0.26 40 / 0.85); }
+.bub.mood-cool    { --core-color: oklch(78% 0.20 145); --edge-color: oklch(88% 0.12 165); --halo-color: oklch(80% 0.22 145 / 0.55); }
+.bub.mood-dab     { --core-color: oklch(76% 0.22 30);  --edge-color: oklch(88% 0.14 320); --halo-color: oklch(76% 0.24 30 / 0.65); }
+.bub.mood-dunk    { --core-color: oklch(80% 0.16 220); --edge-color: oklch(88% 0.10 230); --halo-color: oklch(80% 0.18 220 / 0.55); }
+.bub.mood-clean   { --core-color: oklch(85% 0.12 130); --edge-color: oklch(92% 0.06 160); --halo-color: oklch(85% 0.14 130 / 0.50); }
+.bub.mood-done    { --core-color: oklch(82% 0.16 305); --edge-color: oklch(92% 0.08 320); --halo-color: oklch(82% 0.20 305 / 0.65); }
+
+.bub__sparkles { position: absolute; inset: -40px; pointer-events: none; }
+.bub__sparkles span { position: absolute; color: var(--accent); font-size: 14px; opacity: 0; }
+.bub.mood-done .bub__sparkles span { animation: sparkle-float 3s ease-in-out infinite; }
+.bub__sparkles span:nth-child(1) { top: 10%; left: 8%; animation-delay: 0s; }
+.bub__sparkles span:nth-child(2) { top: 15%; right: 6%; animation-delay: 0.6s; }
+.bub__sparkles span:nth-child(3) { bottom: 18%; left: 12%; animation-delay: 1.2s; }
+.bub__sparkles span:nth-child(4) { bottom: 8%; right: 14%; animation-delay: 1.8s; }
+@keyframes sparkle-float { 0%, 100% { opacity: 0; transform: scale(0.4) translateY(0); } 50% { opacity: 1; transform: scale(1) translateY(-10px); } }
+
+.bub-shimmer {
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  width: 60%; height: 80px;
+  background:
+    radial-gradient(ellipse 50% 40% at 30% 80%, oklch(85% 0.12 50 / 0.35), transparent 70%),
+    radial-gradient(ellipse 40% 60% at 70% 60%, oklch(88% 0.10 30 / 0.30), transparent 75%);
+  filter: blur(8px); opacity: 0; pointer-events: none;
+  transition: opacity 600ms var(--ease);
+  animation: shimmer-rise 4s ease-in-out infinite;
+}
+.orb-cell:has(.bub.mood-heat) .bub-shimmer { opacity: 1; }
+@keyframes shimmer-rise { 0%, 100% { transform: translateX(-50%) translateY(0) scaleY(1); } 50% { transform: translateX(-50%) translateY(-8px) scaleY(1.08); } }
+
+/* ============================================================
+   Slot — the changing center content
+   ============================================================ */
+.slot { display: flex; flex-direction: column; gap: 14px; position: relative; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.eyebrow .num { font-feature-settings: "tnum"; color: var(--accent); font-weight: 600; }
+h1.title { font-family: var(--font-display); font-weight: 600; font-size: clamp(24px, 4.2vw, 32px); line-height: 1.08; letter-spacing: -0.02em; color: var(--fg); text-wrap: balance; }
+.sub { font-size: 15px; color: var(--muted); line-height: 1.45; text-wrap: pretty; max-width: 38ch; }
+
+.btn {
+  appearance: none; font-family: var(--font-display); font-weight: 600; font-size: 17px; letter-spacing: -0.005em;
+  padding: 15px 24px; border-radius: 999px;
+  background: var(--accent); color: oklch(20% 0.02 30);
+  box-shadow: var(--shadow-pop);
+  transition: transform 180ms var(--spring), box-shadow 180ms var(--ease), background 220ms var(--ease);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; text-align: center;
+}
+.btn:hover { background: var(--accent-deep); color: oklch(99% 0.005 30); }
+.btn:active { transform: scale(0.96); }
+.btn[disabled] { background: var(--border); color: var(--muted); box-shadow: none; cursor: not-allowed; }
+.btn--ghost { background: transparent; color: var(--fg); box-shadow: none; border: 1px solid var(--border); }
+.btn--ghost:hover { background: var(--surface); color: var(--fg); }
+.btn-row { display: flex; gap: 10px; align-items: stretch; }
+.btn-row > * { flex: 1; }
+.btn-row .narrow { flex: 0 0 auto; padding: 15px; }
+
+/* ============================================================
+   Setup target card
+   ============================================================ */
+.target-card { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 16px 20px; box-shadow: var(--shadow-soft); display: flex; flex-direction: column; gap: 10px; }
+.target-card--empty { background: transparent; border-style: dashed; box-shadow: none; }
+.target-card--empty .target-temp__num { color: var(--muted); }
+.target-card--empty .slider input[type="range"] { pointer-events: none; }
+.target-card--empty .slider__thumb { border-color: var(--border); background: var(--bg); }
+
+.target-temp { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; }
+.target-temp__lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.target-temp__num { font-family: var(--font-display); font-weight: 600; font-size: clamp(56px, 11vw, 88px); line-height: 1; letter-spacing: -0.04em; color: var(--fg); font-feature-settings: "tnum"; }
+.target-temp__num .deg { color: var(--accent); font-size: 0.55em; vertical-align: super; margin-left: 2px; letter-spacing: -0.02em; }
+.target-temp__hint { font-size: 12.5px; color: var(--muted); text-align: center; text-wrap: pretty; max-width: 36ch; line-height: 1.4; }
+
+.slider { --val: 0.5; position: relative; width: 100%; padding: 8px 0 2px; }
+.slider__track {
+  position: relative; height: 6px; border-radius: 999px;
+  background: linear-gradient(to right,
+    oklch(85% 0.12 165) 0%, oklch(88% 0.12 95) 35%,
+    oklch(80% 0.18 50) 70%, oklch(72% 0.22 30) 100%);
+}
+.slider__thumb {
+  position: absolute; top: 50%; left: calc(var(--val) * 100%);
+  transform: translate(-50%, -50%);
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--surface); border: 2.5px solid var(--accent); box-shadow: var(--shadow-soft);
+  transition: transform 160ms var(--spring);
+}
+.slider input[type="range"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: grab; }
+.slider input[type="range"]:active { cursor: grabbing; }
+.slider input[type="range"]:active + .slider__visual .slider__thumb { transform: translate(-50%, -50%) scale(1.15); }
+.slider__visual { pointer-events: none; }
+.slider__legend { display: flex; justify-content: space-between; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+.live { display: flex; align-items: baseline; justify-content: center; gap: 14px; font-feature-settings: "tnum"; }
+.live__num { font-family: var(--font-display); font-weight: 600; font-size: clamp(72px, 14vw, 116px); line-height: 0.95; letter-spacing: -0.045em; color: var(--fg); font-variant-numeric: tabular-nums; }
+.live__num .deg { color: var(--accent); font-size: 0.42em; vertical-align: super; margin-left: 2px; }
+.live__target { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.live__target b { font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--fg); letter-spacing: -0.01em; text-transform: none; }
+
+.bar { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; position: relative; }
+.bar__fill {
+  position: absolute; inset: 0 auto 0 0; width: var(--bar, 0%);
+  background: linear-gradient(to right, oklch(85% 0.16 60), var(--accent));
+  border-radius: 999px; transition: width 240ms var(--ease);
+}
+.bar.is-cool .bar__fill {
+  background: linear-gradient(to right,
+    oklch(72% 0.22 30) 0%, oklch(80% 0.18 50) 30%,
+    oklch(88% 0.12 95) 60%, oklch(82% 0.20 145) 100%);
+}
+
+.window-chip {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); padding: 6px 12px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border);
+  align-self: center; display: inline-flex; align-items: center; gap: 6px;
+  transition: all 280ms var(--ease);
+}
+.window-chip.in-window { color: oklch(35% 0.12 165); background: oklch(96% 0.06 165); border-color: oklch(82% 0.10 165); animation: chip-pop 480ms var(--spring); }
+@keyframes chip-pop { 0% { transform: scale(0.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
+.window-chip .pulse { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 1; transform: scale(1.3); } }
+
+.recap { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; box-shadow: var(--shadow-soft); }
+.recap__cell { display: flex; flex-direction: column; gap: 2px; }
+.recap__lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.recap__val { font-family: var(--font-display); font-weight: 600; font-size: 15px; color: var(--fg); line-height: 1.25; }
+
+.foot { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--muted); text-align: center; padding-top: 12px; opacity: 0.85; }
+.foot a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.foot a:hover { color: var(--fg); }
+
+.slot.entering { animation: peek-in 480ms var(--spring) both; }
+@keyframes peek-in { 0% { opacity: 0; transform: translateY(10px) scale(0.985); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* ============================================================
+   Carousels — the main pickers, top + bottom of orb
+   ============================================================ */
+.carousel {
+  display: flex; flex-direction: column; gap: 6px;
+  overflow: hidden;
+  max-height: 230px;
+  opacity: 1;
+  transition:
+    max-height 540ms var(--ease),
+    opacity 380ms var(--ease),
+    transform 540ms var(--ease),
+    margin 460ms var(--ease),
+    padding 460ms var(--ease);
+}
+.carousel.is-hidden {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0; margin-bottom: 0;
+  padding-top: 0; padding-bottom: 0;
+  pointer-events: none;
+}
+.carousel-top.is-hidden { transform: translateY(-16px); }
+.carousel-bottom.is-hidden { transform: translateY(16px); }
+@media (min-width: 1100px) {
+  .carousel { max-height: 250px; }
+}
+
+.carousel__head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  padding: 0 2px;
+}
+.carousel__head .num { color: var(--accent); font-weight: 600; margin-right: 6px; }
+.carousel__sub {
+  font-family: var(--font-display); font-weight: 600; font-size: 14px;
+  letter-spacing: -0.005em; color: var(--fg); text-transform: none;
+  text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 65%;
+}
+.carousel__sub.is-empty { color: var(--muted); font-weight: 500; }
+
+.carousel__chips {
+  display: flex; gap: 5px; overflow-x: auto;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  margin: 0 -24px; padding: 2px 24px;
+  scroll-snap-type: x mandatory;
+}
+.carousel__chips::-webkit-scrollbar { display: none; }
+.chip {
+  font-family: var(--font-display); font-size: 12px; font-weight: 500;
+  padding: 5px 11px; border-radius: 11px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  white-space: nowrap; flex-shrink: 0; scroll-snap-align: start;
+  transition: all 200ms var(--ease);
+}
+.chip[aria-pressed="true"] { background: var(--fg); color: oklch(99% 0.01 320); border-color: var(--fg); }
+.chip:active { transform: scale(0.95); }
+
+.carousel__rail {
+  display: flex; gap: 10px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  margin: 0 -24px; padding: 4px 24px 8px;
+  mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+}
+.carousel__rail::-webkit-scrollbar { display: none; }
+
+.tile {
+  flex: 0 0 124px;
+  scroll-snap-align: center;
+  display: grid; grid-template-rows: auto auto auto; gap: 3px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  text-align: left; position: relative;
+  transition: transform 240ms var(--ease), border-color 220ms var(--ease), background 220ms var(--ease), box-shadow 240ms var(--ease);
+}
+.tile:hover { border-color: oklch(85% 0.06 320); transform: translateY(-2px); }
+.tile[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: oklch(98% 0.02 30);
+  box-shadow: 0 8px 22px oklch(70% 0.10 30 / 0.22);
+  transform: translateY(-3px);
+}
+.tile:active { transform: scale(0.97); }
+
+.tile__img {
+  width: 100%; aspect-ratio: 1;
+  border-radius: 10px;
+  background: radial-gradient(circle at 30% 30%, oklch(99% 0.005 320), oklch(96% 0.02 320));
+  border: 1px solid var(--border);
+  overflow: hidden; display: grid; place-items: center;
+  position: relative;
+}
+.tile[data-kind="conc"] .tile__img { background: oklch(96% 0.02 320); }
+.tile[data-kind="banger"] .tile__img img { width: 100%; height: 100%; object-fit: contain; padding: 4px; mix-blend-mode: multiply; display: block; }
+.tile[data-kind="conc"] .tile__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile[aria-pressed="true"] .tile__img { border-color: var(--accent); }
+
+.tile__name {
+  font-family: var(--font-display); font-weight: 600; font-size: 13px;
+  color: var(--fg); line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 2px 2px 0;
+}
+.tile__meta {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 0 2px 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+@media (min-width: 760px) { .tile { flex: 0 0 138px; } .tile__name { font-size: 13.5px; } }
+@media (min-width: 1100px) { .tile { flex: 0 0 152px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bub, .bub__halo, .bub-shimmer, .bub__sparkles span { animation: none !important; }
+  .slot.entering { animation: none; }
+  .carousel { transition-duration: 0ms !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="head">
+    <div class="wordmark">dabwith<span class="me">.me</span></div>
+    <div class="steps" id="steps" aria-hidden="true"></div>
+    <button class="head-action" id="reset-btn" type="button" aria-label="start over" hidden>start over</button>
+  </header>
+
+  <main class="stage" id="stage">
+    <aside class="carousel carousel-top is-hidden" id="carousel-banger" aria-label="banger picker"></aside>
+    <div class="center-row">
+      <div class="orb-cell">
+        <div class="bub mood-idle sleepy" id="bub" role="button" aria-label="bub — tap to skip phase">
+          <div class="bub__halo"></div>
+          <div class="bub__body"></div>
+          <div class="bub__cheek left"></div>
+          <div class="bub__cheek right"></div>
+          <div class="bub__face">
+            <div class="bub__eye"></div>
+            <div class="bub__eye"></div>
+          </div>
+          <div class="bub__mouth"></div>
+          <div class="bub__sparkles"><span>✦</span><span>✦</span><span>✦</span><span>✦</span></div>
+        </div>
+        <div class="bub-shimmer" id="bub-shimmer" aria-hidden="true"></div>
+      </div>
+      <div class="slot" id="slot" aria-live="polite"></div>
+    </div>
+    <aside class="carousel carousel-bottom is-hidden" id="carousel-conc" aria-label="concentrate picker"></aside>
+  </main>
+
+  <p class="foot">made for slow seshes · <a href="#" id="about-link">what's this?</a></p>
+</div>
+
+<script>
+const BANGERS = [
+  { id: 'flat-top',     name: 'flat top',          cat: 'classic',   range: [500, 600], heat: [20, 40], cool: [30, 45], cue: 'just shy of orange glow',                     tags: ['classic'],                  img: '/tiles/mop1lbk4-input_r1_c1.png' },
+  { id: 'beveled',      name: 'beveled edge',      cat: 'classic',   range: [480, 580], heat: [25, 35], cool: [35, 50], cue: 'just barely glowing',                         tags: ['classic', 'better seal'],   img: '/tiles/mop1lbo1-input_r14_c1.png' },
+  { id: 'round-bottom', name: 'round bottom',      cat: 'classic',   range: [500, 600], heat: [30, 45], cool: [30, 50], cue: 'just before glow on the curve',               tags: ['classic', 'cold-start'],    img: '/tiles/mop1lbnf-input_r10_c3.png' },
+  { id: 'opaque',       name: 'opaque bottom',     cat: 'premium',   range: [480, 560], heat: [30, 40], cool: [45, 60], cue: 'faint side-wall glow only',                   tags: ['premium', 'best ir'],       img: '/tiles/mop1lblt-input_r6_c1.png' },
+  { id: 'thermal',      name: 'thermal (2-wall)',  cat: 'specialty', range: [500, 600], heat: [30, 45], cool: [45, 60], cue: 'no glow, faint outer corner only',            tags: ['ir reads low'],             img: '/tiles/mop1lbn1-input_r10_c1.png' },
+  { id: 'core-reactor', name: 'core reactor',      cat: 'specialty', range: [500, 580], heat: [25, 30], cool: [45, 60], cue: 'heat shimmer, no orange',                     tags: ['heat mass', 'cold-start'],  img: '/tiles/mop1lbnl-input_r12_c1.png' },
+  { id: 'terp-slurper', name: 'terp slurper',      cat: 'slurper',   range: [420, 580], heat: [55, 90], cool: [35, 60], cue: 'faint dish glow only',                        tags: ['slurper'],                  img: '/tiles/mop1lblc-input_r3_c1.png' },
+  { id: 'blender',      name: 'blender / vector',  cat: 'slurper',   range: [500, 580], heat: [25, 35], cool: [30, 45], cue: 'faint red bottom corner',                     tags: ['slurper', 'auto-spin'],     img: '/tiles/mop1lbl1-input_r1_c3.png' },
+  { id: 'spinner',      name: 'spinner',           cat: 'slurper',   range: [500, 600], heat: [25, 40], cool: [45, 60], cue: 'faint glow on the bottom',                    tags: ['slurper', 'auto-spin'],     img: '/tiles/mop1lbl1-input_r1_c3.png' },
+  { id: 'control-tower',name: 'control tower',     cat: 'slurper',   range: [450, 580], heat: [50, 60], cool: [30, 45], cue: 'pillar visibly at temp',                      tags: ['slurper', 'se pillar'],     img: '/tiles/mop1lbls-input_r3_c3.png' },
+  { id: 'charmer',      name: 'quave charmer',     cat: 'slurper',   range: [450, 580], heat: [35, 50], cool: [30, 45], cue: 'no glow, faint dish only',                    tags: ['slurper'],                  img: '/tiles/mop1lbnp-input_r12_c3.png' },
+  { id: 'insert',       name: 'quartz insert',     cat: 'specialty', range: [450, 550], heat: [25, 35], cool: [10, 30], cue: 'per host banger',                             tags: ['cold-start'],               img: '/tiles/mop1lbmk-input_r8_c3.png' },
+  { id: 'swing-arm',    name: 'swing-arm',         cat: 'specialty', range: [500, 600], heat: [15, 30], cool: [10, 30], cue: 'slight shimmer, no red',                      tags: ['legacy'],                   img: '/tiles/mop1lbk4-input_r1_c1.png' },
+  { id: 'e-banger',     name: 'e-banger',          cat: 'specialty', range: [500, 600], heat: [30, 30], cool: [0, 0],   cue: 'coil at set temp',                            tags: ['electric'],                 img: '/tiles/mop1lblz-input_r6_c3.png' },
+];
+
+const CONCS = [
+  { id: 'cold-cure',    name: 'cold cure rosin',     cat: 'solventless', opt: 460, range: [375, 510], terp: 'high', desc: 'live rosin nucleated to creamy badder. most popular 2026 rosin format.', img: '/tiles/mop1p9he-tile_7.png' },
+  { id: 'live-rosin',   name: 'live rosin',          cat: 'solventless', opt: 480, range: [445, 520], terp: 'high', desc: 'fresh-frozen pressed solventless. glossy amber, sappy.',                  img: '/tiles/mop1p9gl-tile_2.png' },
+  { id: 'fresh-press',  name: 'fresh press rosin',   cat: 'solventless', opt: 470, range: [440, 510], terp: 'high', desc: 'un-cured rosin. terps not yet homogenized.',                              img: '/tiles/mop1p9h0-tile_5.png' },
+  { id: 'rosin-jam',    name: 'rosin jam',           cat: 'solventless', opt: 510, range: [490, 545], terp: 'high', desc: 'thca diamonds in terpene-rich rosin sauce.',                              img: '/tiles/mop1p9h0-tile_5.png' },
+  { id: 'rosin-badder', name: 'rosin badder',        cat: 'solventless', opt: 510, range: [480, 540], terp: 'high', desc: 'whipped/agitated rosin. hashwriter avg 520°f terpometer interior.',      img: '/tiles/mop1p9g4-tile_0.png' },
+  { id: 'hash-coin',    name: 'hash rosin coin',     cat: 'solventless', opt: 475, range: [450, 520], terp: 'high', desc: 'pressed disk from 5-6 star bubble. premium fresh-frozen input.',         img: '/tiles/mop1p9gy-tile_4.png' },
+  { id: 'persy',        name: 'persy hash rosin',    cat: 'solventless', opt: 480, range: [445, 520], terp: 'high', desc: '710 labs originated. 6-star 90-micron first-wash bubble.',                img: '/tiles/mop1p9h9-tile_6.png' },
+  { id: 'high-melt',    name: 'high-melt nug-run',   cat: 'solventless', opt: 475, range: [445, 510], terp: 'high', desc: 'premium hash rosin from highest-grade nugs. connoisseur tier.',           img: '/tiles/mop1p9h9-tile_6.png' },
+  { id: 'bubble-6',     name: 'bubble · 6-star',     cat: 'hash',        opt: 490, range: [450, 510], terp: 'high', desc: 'ice water hash, full-melt grade. hashwriter avg 477.5°f.',                img: '/tiles/mop1p9gy-tile_4.png' },
+  { id: 'dry-sift',     name: 'dry sift (full melt)',cat: 'hash',        opt: 490, range: [450, 520], terp: 'high', desc: 'mechanically separated trichomes via 45–160µm screens.',                  img: '/tiles/mop1p9gy-tile_4.png' },
+  { id: 'temple-ball',  name: 'temple ball',         cat: 'hash',        opt: 400, range: [350, 450], terp: 'high', desc: 'hand-rolled spherical hash, nepalese-style. frenchy cannoli legacy.',     img: '/tiles/mop1p9oa-tile_12.png' },
+  { id: 'live-resin',   name: 'live resin',          cat: 'hydrocarbon', opt: 510, range: [480, 545], terp: 'high', desc: 'fresh-frozen hydrocarbon bho. ~34% of concentrate sales.',                img: '/tiles/mop1p9gr-tile_3.png' },
+  { id: 'cured-resin',  name: 'cured resin',         cat: 'hydrocarbon', opt: 545, range: [520, 580], terp: 'low',  desc: 'bho from cured flower. lost most volatile monoterps.',                    img: '/tiles/mop1p9gr-tile_3.png' },
+  { id: 'shatter',      name: 'shatter',             cat: 'hydrocarbon', opt: 545, range: [510, 580], terp: 'low',  desc: 'glassy bho. once dominant, now legacy/budget tier.',                      img: '/tiles/mop1p9ho-tile_10.png' },
+  { id: 'wax',          name: 'wax / budder',        cat: 'hydrocarbon', opt: 510, range: [480, 540], terp: 'med',  desc: 'whipped bho. stable mid-tier across menus.',                              img: '/tiles/mop1p9gb-tile_1.png' },
+  { id: 'crumble',      name: 'crumble',             cat: 'hydrocarbon', opt: 510, range: [480, 550], terp: 'med',  desc: 'dry powdery bho. lower moisture vaporizes easily.',                       img: '/tiles/mop1p9gb-tile_1.png' },
+  { id: 'sugar',        name: 'sugar wax',           cat: 'hydrocarbon', opt: 510, range: [480, 545], terp: 'high', desc: 'small thca crystals in terpene matrix.',                                  img: '/tiles/mop1p9hq-tile_11.png' },
+  { id: 'sauce',        name: 'sauce (htfse)',       cat: 'hydrocarbon', opt: 530, range: [500, 580], terp: 'high', desc: '~50% terpenes — viscous syrup with diamonds.',                            img: '/tiles/mop1p9hg-tile_8.png' },
+  { id: 'thca',         name: 'thca diamonds',       cat: 'hydrocarbon', opt: 545, range: [500, 600], terp: 'none', desc: 'discrete crystalline gemstones, 95–99% thca, near-zero terps.',           img: '/tiles/mop1p9hk-tile_9.png' },
+  { id: 'di-sauce',     name: 'diamonds & sauce',    cat: 'hydrocarbon', opt: 530, range: [510, 570], terp: 'high', desc: 'crystals in terpene-rich sauce.',                                         img: '/tiles/mop1p9hk-tile_9.png' },
+  { id: 'liquid-d',     name: 'liquid diamonds',     cat: 'hydrocarbon', opt: 530, range: [500, 570], terp: 'high', desc: 'live resin + thca diamonds. dominant high-potency cart.',                 img: '/tiles/mop1p9hg-tile_8.png' },
+  { id: 'co2',          name: 'co2 oil',             cat: 'distillate',  opt: 560, range: [520, 600], terp: 'low',  desc: 'supercritical co2 extraction. most volatile terps lost.',                 img: '/tiles/mop1p9gr-tile_3.png' },
+  { id: 'distillate',   name: 'thc distillate',      cat: 'distillate',  opt: 580, range: [540, 620], terp: 'none', desc: '~99% pure, viscous, terpene-stripped. primarily for carts.',              img: '/tiles/mop1p9oa-tile_12.png' },
+  { id: 'cbn',          name: 'cbn distillate',      cat: 'distillate',  opt: 525, range: [490, 570], terp: 'low',  desc: 'cbn-focused, often blended with sleep terpenes.',                         img: '/tiles/mop1p9oa-tile_12.png' },
+];
+
+const BANGER_CATS = [
+  { id: 'all',       label: 'all' },
+  { id: 'classic',   label: 'classic' },
+  { id: 'slurper',   label: 'slurper' },
+  { id: 'specialty', label: 'specialty' },
+  { id: 'premium',   label: 'premium' },
+];
+const CONC_CATS = [
+  { id: 'all',         label: 'all' },
+  { id: 'solventless', label: 'rosin & hash' },
+  { id: 'hash',        label: 'bubble' },
+  { id: 'hydrocarbon', label: 'bho' },
+  { id: 'distillate',  label: 'distillate' },
+];
+
+const VISIBLE_STEPS = ['welcome', 'setup', 'heat', 'cool', 'done'];
+const KEY = 'dabwithme.web.v2';
+
+const initial = {
+  phase: 'welcome',
+  bangerId: null, concId: null,
+  bangerCat: 'all', concCat: 'all',
+  targetTemp: null, trim: 0,
+  heatStart: null, heatHit: null,
+  coolStart: null, windowEntered: null,
+  windowFloor: null, windowCeil: null,
+  dabStart: null, dunkStart: null, cleanStart: null,
+};
+
+let state = (() => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (stored && typeof stored === 'object' && stored.phase) {
+      const merged = Object.assign({}, initial, stored);
+      // migrate legacy phases
+      if (['banger', 'concentrate', 'target'].includes(merged.phase)) merged.phase = 'setup';
+      return merged;
+    }
+    // also try v1 key for migration
+    const v1 = JSON.parse(localStorage.getItem('dabwithme.web.v1') || 'null');
+    if (v1 && typeof v1 === 'object' && v1.phase) {
+      const merged = Object.assign({}, initial, v1);
+      if (['banger', 'concentrate', 'target'].includes(merged.phase)) merged.phase = 'setup';
+      return merged;
+    }
+  } catch (e) {}
+  return Object.assign({}, initial);
+})();
+
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} };
+const reset = () => { state = Object.assign({}, initial); save(); render(); };
+
+let timers = [];
+const clearTimers = () => { timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = []; };
+const after = (ms, fn) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
+const every = (ms, fn) => { const id = setInterval(fn, ms); timers.push(id); return id; };
+
+const elBub = document.getElementById('bub');
+const elSlot = document.getElementById('slot');
+const elSteps = document.getElementById('steps');
+const elReset = document.getElementById('reset-btn');
+const elStage = document.getElementById('stage');
+const elCarBanger = document.getElementById('carousel-banger');
+const elCarConc = document.getElementById('carousel-conc');
+
+const T_AMB = 75;
+function tau(banger) {
+  const mid = (banger.heat[0] + banger.heat[1]) / 2;
+  return mid / 2.3026;
+}
+function heatTempAt(elapsedMs, target, banger) {
+  const t = elapsedMs / 1000;
+  return T_AMB + (target - T_AMB) * (1 - Math.exp(-t / tau(banger)));
+}
+function coolTempAt(elapsedMs, peak, banger) {
+  const mid = (banger.cool[0] + banger.cool[1]) / 2;
+  const tauCool = mid / 2.3026;
+  const t = elapsedMs / 1000;
+  return T_AMB + (peak - T_AMB) * Math.exp(-t / tauCool);
+}
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const fmtTime = (ms) => {
+  if (ms == null || ms < 0) return '0:00';
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+};
+const fmtSec = (ms) => Math.floor(ms / 1000) + 's';
+
+const findBanger = id => BANGERS.find(b => b.id === id);
+const findConc = id => CONCS.find(c => c.id === id);
+
+function computeTarget(banger, conc) {
+  if (!banger || !conc) return null;
+  const lo = Math.max(banger.range[0], conc.range[0]);
+  const hi = Math.min(banger.range[1], conc.range[1]);
+  let t;
+  if (lo > hi) t = Math.round((banger.range[0] + banger.range[1]) / 2);
+  else if (conc.opt >= lo && conc.opt <= hi) t = conc.opt;
+  else t = Math.round((lo + hi) / 2);
+  return Math.round(t / 5) * 5;
+}
+
+const MOOD_MAP = {
+  welcome: { mood: 'idle',    eye: 'sleepy' },
+  setup:   { mood: 'curious', eye: 'curious' },
+  heat:    { mood: 'heat',    eye: 'concentrating' },
+  cool:    { mood: 'cool',    eye: 'wide' },
+  dab:     { mood: 'dab',     eye: 'surprised' },
+  dunk:    { mood: 'dunk',    eye: 'happy' },
+  clean:   { mood: 'clean',   eye: 'tidy' },
+  done:    { mood: 'done',    eye: 'starry' },
+};
+const ALL_MOODS = ['idle','curious','eager','heat','cool','dab','dunk','clean','done'];
+const ALL_EYES = ['sleepy','curious','wide','eager','concentrating','surprised','happy','tidy','starry'];
+
+function setMood(phase) {
+  const m = MOOD_MAP[phase] || MOOD_MAP.welcome;
+  ALL_MOODS.forEach(x => elBub.classList.remove('mood-' + x));
+  ALL_EYES.forEach(x => elBub.classList.remove(x));
+  // setup mood: if both picked, switch to eager
+  if (phase === 'setup' && state.bangerId && state.concId) {
+    elBub.classList.add('mood-eager'); elBub.classList.add('eager');
+  } else {
+    elBub.classList.add('mood-' + m.mood);
+    elBub.classList.add(m.eye);
+  }
+  setBreatheRate(4);
+  elBub.style.removeProperty('--core-color');
+  elBub.style.removeProperty('--edge-color');
+  elBub.style.removeProperty('--halo-color');
+}
+function setBreatheRate(seconds) { elBub.style.setProperty('--breathe', seconds.toFixed(2) + 's'); }
+
+function setHeatColor(progress) {
+  const lightness = lerp(85, 70, progress);
+  const chroma = lerp(0.12, 0.26, progress);
+  const hue = lerp(40, 28, progress);
+  elBub.style.setProperty('--core-color', `oklch(${lightness}% ${chroma.toFixed(3)} ${hue.toFixed(1)})`);
+  elBub.style.setProperty('--edge-color', `oklch(${lightness + 8}% ${(chroma * 0.7).toFixed(3)} ${(hue + 20).toFixed(1)})`);
+  elBub.style.setProperty('--halo-color', `oklch(${lightness}% ${(chroma + 0.04).toFixed(3)} ${hue.toFixed(1)} / ${(0.5 + 0.4 * progress).toFixed(2)})`);
+}
+function setCoolColor(progress) {
+  let hue, chroma, lightness;
+  if (progress < 0.4) {
+    const t = progress / 0.4;
+    hue = lerp(28, 60, t); chroma = lerp(0.24, 0.20, t); lightness = lerp(72, 80, t);
+  } else if (progress < 0.75) {
+    const t = (progress - 0.4) / 0.35;
+    hue = lerp(60, 95, t); chroma = lerp(0.20, 0.14, t); lightness = lerp(88, 80, t);
+  } else {
+    const t = clamp((progress - 0.75) / 0.25, 0, 1);
+    hue = lerp(95, 145, t); chroma = lerp(0.14, 0.20, t); lightness = lerp(88, 80, t);
+  }
+  elBub.style.setProperty('--core-color', `oklch(${lightness}% ${chroma.toFixed(3)} ${hue.toFixed(1)})`);
+  elBub.style.setProperty('--edge-color', `oklch(${lightness + 8}% ${(chroma * 0.6).toFixed(3)} ${(hue + 10).toFixed(1)})`);
+  elBub.style.setProperty('--halo-color', `oklch(${lightness}% ${(chroma + 0.04).toFixed(3)} ${hue.toFixed(1)} / 0.55)`);
+}
+
+let blinkTimer = null;
+function startBlinking() {
+  stopBlinking();
+  const blinkOnce = () => { elBub.classList.add('blinking'); setTimeout(() => elBub.classList.remove('blinking'), 130); };
+  const sched = () => { const next = 3500 + Math.random() * 2500; blinkTimer = setTimeout(() => { blinkOnce(); sched(); }, next); };
+  sched();
+}
+function stopBlinking() { if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; } elBub.classList.remove('blinking'); }
+
+function carouselsHidden(hidden) {
+  elCarBanger.classList.toggle('is-hidden', hidden);
+  elCarConc.classList.toggle('is-hidden', hidden);
+  elStage.classList.toggle('is-live', hidden);
+}
+
+function render() {
+  clearTimers();
+  renderSteps();
+  elReset.hidden = state.phase === 'welcome';
+  setMood(state.phase);
+  if (state.phase === 'heat' || state.phase === 'cool') stopBlinking(); else startBlinking();
+
+  // carousels visible only in setup
+  carouselsHidden(state.phase !== 'setup');
+
+  // populate carousels (always — costs nothing when hidden, makes the slide-in seamless)
+  populateBangerCarousel();
+  populateConcCarousel();
+
+  elSlot.classList.remove('entering');
+  void elSlot.offsetWidth;
+  elSlot.classList.add('entering');
+  elSlot.innerHTML = '';
+
+  switch (state.phase) {
+    case 'welcome': renderWelcome(); break;
+    case 'setup':   renderSetup(); break;
+    case 'heat':    renderHeat(); break;
+    case 'cool':    renderCool(); break;
+    case 'dab':     renderDab(); break;
+    case 'dunk':    renderDunk(); break;
+    case 'clean':   renderClean(); break;
+    case 'done':    renderDone(); break;
+    default:        state.phase = 'welcome'; renderWelcome();
+  }
+  save();
+}
+
+function renderSteps() {
+  elSteps.innerHTML = '';
+  const key = stepKey(state.phase);
+  const idx = VISIBLE_STEPS.indexOf(key);
+  VISIBLE_STEPS.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.className = 'step-dot' + (i < idx ? ' done' : i === idx ? ' current' : '');
+    elSteps.appendChild(d);
+  });
+}
+function stepKey(phase) {
+  if (['dab','dunk','clean'].includes(phase)) return 'cool';
+  return phase;
+}
+
+/* ============================================================
+   Carousel rendering
+   ============================================================ */
+
+function buildTile(item, kind) {
+  const tile = document.createElement('button');
+  tile.className = 'tile';
+  tile.type = 'button';
+  tile.dataset.kind = kind;
+  tile.dataset.id = item.id;
+  const isSelected = (kind === 'banger' ? state.bangerId : state.concId) === item.id;
+  tile.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+  const meta = kind === 'banger'
+    ? `${item.range[0]}–${item.range[1]}°f`
+    : `${item.opt}°f opt`;
+  tile.innerHTML = `
+    <div class="tile__img"><img src="${item.img}" alt="" loading="lazy" /></div>
+    <div class="tile__name">${item.name}</div>
+    <div class="tile__meta">${meta}</div>
+  `;
+  return tile;
+}
+
+function populateBangerCarousel() {
+  const banger = findBanger(state.bangerId);
+  const subText = banger ? banger.name : 'pick one';
+  const subClass = banger ? '' : ' is-empty';
+  elCarBanger.innerHTML = `
+    <div class="carousel__head">
+      <span><span class="num">01</span> banger</span>
+      <span class="carousel__sub${subClass}" id="sub-banger">${subText}</span>
+    </div>
+    <div class="carousel__chips" role="tablist" id="chips-banger"></div>
+    <div class="carousel__rail" role="listbox" id="rail-banger"></div>
+  `;
+  const chipsEl = document.getElementById('chips-banger');
+  const railEl = document.getElementById('rail-banger');
+
+  const drawChips = () => {
+    chipsEl.innerHTML = '';
+    BANGER_CATS.forEach(cat => {
+      const c = document.createElement('button');
+      c.className = 'chip'; c.type = 'button'; c.textContent = cat.label;
+      c.setAttribute('aria-pressed', state.bangerCat === cat.id ? 'true' : 'false');
+      c.onclick = () => { state.bangerCat = cat.id; drawChips(); drawRail(); };
+      chipsEl.appendChild(c);
+    });
+  };
+  const drawRail = () => {
+    railEl.innerHTML = '';
+    const items = state.bangerCat === 'all' ? BANGERS : BANGERS.filter(b => b.cat === state.bangerCat);
+    items.forEach(b => {
+      const tile = buildTile(b, 'banger');
+      tile.onclick = () => {
+        state.bangerId = b.id;
+        railEl.querySelectorAll('.tile').forEach(t => t.setAttribute('aria-pressed','false'));
+        tile.setAttribute('aria-pressed', 'true');
+        const sub = document.getElementById('sub-banger');
+        if (sub) { sub.textContent = b.name; sub.classList.remove('is-empty'); }
+        save();
+        if (state.phase === 'setup') refreshSetupSlot();
+        else if (state.phase === 'welcome') { state.phase = 'setup'; render(); }
+        setMood(state.phase);
+      };
+      railEl.appendChild(tile);
+    });
+    requestAnimationFrame(() => scrollSelectedTileIntoView(railEl));
+  };
+  drawChips(); drawRail();
+}
+
+function populateConcCarousel() {
+  const conc = findConc(state.concId);
+  const subText = conc ? conc.name : 'pick one';
+  const subClass = conc ? '' : ' is-empty';
+  elCarConc.innerHTML = `
+    <div class="carousel__head">
+      <span><span class="num">02</span> concentrate</span>
+      <span class="carousel__sub${subClass}" id="sub-conc">${subText}</span>
+    </div>
+    <div class="carousel__chips" role="tablist" id="chips-conc"></div>
+    <div class="carousel__rail" role="listbox" id="rail-conc"></div>
+  `;
+  const chipsEl = document.getElementById('chips-conc');
+  const railEl = document.getElementById('rail-conc');
+
+  const drawChips = () => {
+    chipsEl.innerHTML = '';
+    CONC_CATS.forEach(cat => {
+      const c = document.createElement('button');
+      c.className = 'chip'; c.type = 'button'; c.textContent = cat.label;
+      c.setAttribute('aria-pressed', state.concCat === cat.id ? 'true' : 'false');
+      c.onclick = () => { state.concCat = cat.id; drawChips(); drawRail(); };
+      chipsEl.appendChild(c);
+    });
+  };
+  const drawRail = () => {
+    railEl.innerHTML = '';
+    const items = state.concCat === 'all' ? CONCS : CONCS.filter(c => c.cat === state.concCat);
+    items.forEach(c => {
+      const tile = buildTile(c, 'conc');
+      tile.onclick = () => {
+        state.concId = c.id;
+        railEl.querySelectorAll('.tile').forEach(t => t.setAttribute('aria-pressed','false'));
+        tile.setAttribute('aria-pressed', 'true');
+        const sub = document.getElementById('sub-conc');
+        if (sub) { sub.textContent = c.name; sub.classList.remove('is-empty'); }
+        save();
+        if (state.phase === 'setup') refreshSetupSlot();
+        else if (state.phase === 'welcome') { state.phase = 'setup'; render(); }
+        setMood(state.phase);
+      };
+      railEl.appendChild(tile);
+    });
+    requestAnimationFrame(() => scrollSelectedTileIntoView(railEl));
+  };
+  drawChips(); drawRail();
+}
+
+function scrollSelectedTileIntoView(rail) {
+  const sel = rail.querySelector('.tile[aria-pressed="true"]');
+  if (sel) {
+    const target = sel.offsetLeft - rail.clientWidth / 2 + sel.offsetWidth / 2;
+    rail.scrollLeft = Math.max(0, target);
+  }
+}
+
+/* ============================================================
+   Phase renderers
+   ============================================================ */
+
+function renderWelcome() {
+  const isResume = state.bangerId || state.concId;
+  elSlot.innerHTML = `
+    <div class="eyebrow"><span>${isResume ? 'welcome back' : 'hey'}</span></div>
+    <h1 class="title">${isResume ? 'pick up where you left off?' : 'let\'s have a sesh.'}</h1>
+    <p class="sub">i'll walk you through it — pick your banger and concentrate, we heat slow, cool slower, and dab when i turn green.</p>
+    <button class="btn" id="start">${isResume ? 'resume' : 'start'}</button>
+    ${isResume ? `<button class="btn btn--ghost" id="fresh">start fresh</button>` : ''}
+  `;
+  document.getElementById('start').onclick = () => {
+    if (isResume && state.targetTemp) {
+      state.phase = 'heat';
+      state.heatStart = Date.now();
+      state.heatHit = null;
+    } else {
+      state.phase = 'setup';
+    }
+    save(); render();
+  };
+  if (isResume) document.getElementById('fresh').onclick = () => reset();
+}
+
+function renderSetup() {
+  refreshSetupSlot();
+}
+
+function refreshSetupSlot() {
+  const banger = findBanger(state.bangerId);
+  const conc = findConc(state.concId);
+  const ready = banger && conc;
+
+  let base = null, minT = 400, maxT = 620, current = null;
+  if (ready) {
+    base = computeTarget(banger, conc);
+    const lo = Math.max(banger.range[0], conc.range[0]) - 20;
+    const hi = Math.min(banger.range[1], conc.range[1]) + 20;
+    minT = Math.max(lo, base - 80);
+    maxT = Math.min(hi, base + 80);
+    current = clamp(base + state.trim, minT, maxT);
+    state.targetTemp = current;
+    save();
+  }
+
+  let eyebrow;
+  if (!banger && !conc)      eyebrow = `<span>set up your sesh</span>`;
+  else if (banger && !conc)  eyebrow = `<span>↓ now pick a concentrate</span>`;
+  else if (!banger && conc)  eyebrow = `<span>↑ now pick a banger</span>`;
+  else                       eyebrow = `<span class="num">03</span> · target temp`;
+
+  const title = ready ? `i'd shoot for this.` : `pick your gear.`;
+  const hint  = ready ? hintForTemp(current, conc) : `i'll suggest a temp once both are picked.`;
+  const sliderVal = current != null ? current : Math.round((minT + maxT) / 2);
+
+  elSlot.innerHTML = `
+    <div class="eyebrow">${eyebrow}</div>
+    <h1 class="title">${title}</h1>
+    <div class="target-card ${ready ? '' : 'target-card--empty'}">
+      <div class="target-temp">
+        <div class="target-temp__lbl">surface temp</div>
+        <div class="target-temp__num"><span id="t-num">${ready ? current : '—'}</span><span class="deg">°f</span></div>
+        <div class="target-temp__hint" id="t-hint">${hint}</div>
+      </div>
+      <div class="slider" id="slider">
+        <div class="slider__track"></div>
+        <input type="range" id="t-input" min="${minT}" max="${maxT}" step="5" value="${sliderVal}" ${ready ? '' : 'disabled'} />
+        <div class="slider__visual"><div class="slider__thumb"></div></div>
+      </div>
+      <div class="slider__legend">
+        <span>${minT}°f · cooler, more terps</span>
+        <span>${maxT}°f · hotter, more vapor</span>
+      </div>
+    </div>
+    <button class="btn" id="next" ${ready ? '' : 'disabled'}>${ready ? "ready · let's heat" : 'pick to continue'}</button>
+  `;
+
+  if (ready) {
+    const input = document.getElementById('t-input');
+    const num = document.getElementById('t-num');
+    const hintEl = document.getElementById('t-hint');
+    const slider = document.getElementById('slider');
+    const update = () => {
+      const v = parseInt(input.value, 10);
+      state.trim = v - base;
+      state.targetTemp = v;
+      num.textContent = v;
+      hintEl.textContent = hintForTemp(v, conc);
+      slider.style.setProperty('--val', (v - minT) / (maxT - minT));
+    };
+    update();
+    input.oninput = update;
+
+    document.getElementById('next').onclick = () => {
+      state.phase = 'heat';
+      state.heatStart = Date.now();
+      state.heatHit = null;
+      save(); render();
+    };
+  } else {
+    const slider = document.getElementById('slider');
+    if (slider) slider.style.setProperty('--val', '0.5');
+  }
+
+  setMood('setup');
+
+  elSlot.classList.remove('entering');
+  void elSlot.offsetWidth;
+  elSlot.classList.add('entering');
+}
+
+function hintForTemp(t, conc) {
+  if (t < conc.opt - 15) return `low and slow. you'll get the most terp character but a slower release.`;
+  if (t > conc.opt + 15) return `hotter than ideal — more vapor, fewer terps. a fast hit.`;
+  return `right in the pocket for ${conc.name}. balanced terp + vapor.`;
+}
+
+function renderHeat() {
+  const banger = findBanger(state.bangerId);
+  if (!banger) { state.phase = 'setup'; render(); return; }
+  const target = state.targetTemp;
+  if (!state.heatStart || (Date.now() - state.heatStart) > 5 * 60 * 1000) {
+    state.heatStart = Date.now(); state.heatHit = null; save();
+  }
+
+  elSlot.innerHTML = `
+    <div class="eyebrow"><span class="num">04</span> · heat · <span id="h-time">0:00</span></div>
+    <h1 class="title">torch your banger.</h1>
+    <div class="live">
+      <div class="live__num"><span id="h-temp">${T_AMB}</span><span class="deg">°f</span></div>
+      <div class="live__target">target<br><b>${target}°f</b></div>
+    </div>
+    <div class="bar"><div class="bar__fill" id="h-bar" style="--bar: 0%"></div></div>
+    <p class="sub" style="text-align:center; margin: 0 auto;">look for: ${banger.cue.toLowerCase()}.</p>
+    <button class="btn btn--ghost" id="skip">i'm at temp · go to cool</button>
+  `;
+
+  const elTemp = document.getElementById('h-temp');
+  const elTime = document.getElementById('h-time');
+  const elBar = document.getElementById('h-bar');
+
+  const tick = () => {
+    const elapsed = Date.now() - state.heatStart;
+    const T = heatTempAt(elapsed, target, banger);
+    const progress = clamp((T - T_AMB) / (target - T_AMB), 0, 1);
+    elTemp.textContent = Math.round(T);
+    elTime.textContent = fmtTime(elapsed);
+    elBar.style.setProperty('--bar', (progress * 100).toFixed(1) + '%');
+    setHeatColor(progress);
+    setBreatheRate(lerp(4, 1.2, progress));
+
+    if (T >= target - 5 && !state.heatHit) {
+      state.heatHit = Date.now(); save();
+      after(900, () => {
+        state.phase = 'cool';
+        state.coolStart = Date.now();
+        state.windowEntered = null;
+        state.windowFloor = target - 40;
+        state.windowCeil  = target - 10;
+        save(); render();
+      });
+    }
+  };
+  tick();
+  every(160, tick);
+
+  document.getElementById('skip').onclick = () => {
+    if (!state.heatHit) state.heatHit = Date.now();
+    state.phase = 'cool';
+    state.coolStart = Date.now();
+    state.windowFloor = target - 40;
+    state.windowCeil  = target - 10;
+    save(); render();
+  };
+}
+
+function renderCool() {
+  const banger = findBanger(state.bangerId);
+  if (!banger) { state.phase = 'setup'; render(); return; }
+  const target = state.targetTemp;
+  const peak = target;
+  if (!state.coolStart || (Date.now() - state.coolStart) > 10 * 60 * 1000) {
+    state.coolStart = Date.now(); state.windowEntered = null; save();
+  }
+
+  elSlot.innerHTML = `
+    <div class="eyebrow"><span class="num">05</span> · cool · <span id="c-time">0:00</span></div>
+    <h1 class="title">let me cool.<br>lift when i turn green.</h1>
+    <div class="live">
+      <div class="live__num"><span id="c-temp">${target}</span><span class="deg">°f</span></div>
+      <div class="live__target">window<br><b>${state.windowFloor}–${state.windowCeil}</b></div>
+    </div>
+    <div class="bar is-cool"><div class="bar__fill" id="c-bar" style="--bar: 0%"></div></div>
+    <div class="window-chip" id="c-chip"><span class="pulse"></span>cooling…</div>
+    <button class="btn" id="dab-now" disabled>i'm dabbing now</button>
+  `;
+
+  const elTemp = document.getElementById('c-temp');
+  const elTime = document.getElementById('c-time');
+  const elBar = document.getElementById('c-bar');
+  const elChip = document.getElementById('c-chip');
+  const elDabBtn = document.getElementById('dab-now');
+
+  const tick = () => {
+    const elapsed = Date.now() - state.coolStart;
+    const T = coolTempAt(elapsed, peak, banger);
+    elTemp.textContent = Math.round(T);
+    elTime.textContent = fmtTime(elapsed);
+
+    const inCenter = (state.windowFloor + state.windowCeil) / 2;
+    const totalDrop = peak - inCenter;
+    const drop = peak - T;
+    const progress = clamp(drop / totalDrop, 0, 1.2);
+    elBar.style.setProperty('--bar', (clamp(progress, 0, 1) * 100).toFixed(1) + '%');
+    setCoolColor(clamp(progress, 0, 1));
+
+    const inWindow = T >= state.windowFloor && T <= state.windowCeil;
+    if (inWindow) {
+      if (!state.windowEntered) state.windowEntered = Date.now();
+      elChip.classList.add('in-window');
+      elChip.innerHTML = `<span class="pulse"></span>in the pocket — lift it`;
+      elDabBtn.disabled = false;
+    } else if (T < state.windowFloor) {
+      elChip.classList.remove('in-window');
+      elChip.innerHTML = `<span class="pulse"></span>too cool — chase it`;
+      elDabBtn.disabled = false;
+    } else {
+      elChip.classList.remove('in-window');
+      elChip.innerHTML = `<span class="pulse"></span>cooling…`;
+    }
+  };
+  tick();
+  every(160, tick);
+
+  elDabBtn.onclick = () => { state.phase = 'dab'; state.dabStart = Date.now(); save(); render(); };
+}
+
+function renderDab() {
+  const dur = 30000;
+  elSlot.innerHTML = `
+    <div class="eyebrow"><span class="num">06</span> · dab · <span id="d-time">0:00</span></div>
+    <h1 class="title">lift, dab, breathe in.</h1>
+    <p class="sub">slow inhale beats a hot rip. cap when you're done — i'll catch the rest.</p>
+    <div class="bar"><div class="bar__fill" id="d-bar" style="--bar: 0%"></div></div>
+    <button class="btn" id="next">done with this hit</button>
+  `;
+  const elTime = document.getElementById('d-time');
+  const elBar = document.getElementById('d-bar');
+  const tick = () => {
+    const elapsed = Date.now() - state.dabStart;
+    elTime.textContent = fmtTime(elapsed);
+    elBar.style.setProperty('--bar', clamp(elapsed / dur, 0, 1) * 100 + '%');
+  };
+  tick();
+  every(200, tick);
+  document.getElementById('next').onclick = () => { state.phase = 'dunk'; state.dunkStart = Date.now(); save(); render(); };
+}
+
+function renderDunk() {
+  elSlot.innerHTML = `
+    <div class="eyebrow"><span class="num">07</span> · dunk · <span id="dn-time">0:00</span></div>
+    <h1 class="title">time for a swim.</h1>
+    <p class="sub">one swipe in the iso jar. residue lifts while the quartz is still warm — no scrubbing.</p>
+    <button class="btn" id="next">dunked</button>
+  `;
+  const elTime = document.getElementById('dn-time');
+  every(500, () => { elTime.textContent = fmtTime(Date.now() - state.dunkStart); });
+  document.getElementById('next').onclick = () => { state.phase = 'clean'; state.cleanStart = Date.now(); save(); render(); };
+}
+
+function renderClean() {
+  elSlot.innerHTML = `
+    <div class="eyebrow"><span class="num">08</span> · clean · <span id="cl-time">0:00</span></div>
+    <h1 class="title">final swab.<br>cap it.</h1>
+    <p class="sub">last pass. drop the cap on. next sesh starts cleaner this way.</p>
+    <button class="btn" id="next">all done</button>
+  `;
+  const elTime = document.getElementById('cl-time');
+  every(500, () => { elTime.textContent = fmtTime(Date.now() - state.cleanStart); });
+  document.getElementById('next').onclick = () => { state.phase = 'done'; save(); render(); };
+}
+
+function renderDone() {
+  const banger = findBanger(state.bangerId);
+  const conc = findConc(state.concId);
+  const heatMs = state.heatHit && state.heatStart ? (state.heatHit - state.heatStart) : null;
+  const coolMs = state.dabStart && state.coolStart ? (state.dabStart - state.coolStart) : null;
+  const totalMs = state.cleanStart && state.heatStart ? (Date.now() - state.heatStart) : null;
+
+  elSlot.innerHTML = `
+    <div class="eyebrow"><span>good sesh</span></div>
+    <h1 class="title">that was a nice one.</h1>
+    <div class="recap">
+      <div class="recap__cell"><div class="recap__lbl">banger</div><div class="recap__val">${banger ? banger.name : '—'}</div></div>
+      <div class="recap__cell"><div class="recap__lbl">concentrate</div><div class="recap__val">${conc ? conc.name : '—'}</div></div>
+      <div class="recap__cell"><div class="recap__lbl">target</div><div class="recap__val">${state.targetTemp || '—'}°f</div></div>
+      <div class="recap__cell"><div class="recap__lbl">heat time</div><div class="recap__val">${heatMs ? fmtSec(heatMs) : '—'}</div></div>
+      <div class="recap__cell"><div class="recap__lbl">cool time</div><div class="recap__val">${coolMs ? fmtSec(coolMs) : '—'}</div></div>
+      <div class="recap__cell"><div class="recap__lbl">total</div><div class="recap__val">${totalMs ? fmtTime(totalMs) : '—'}</div></div>
+    </div>
+    <button class="btn" id="again">go again</button>
+    <button class="btn btn--ghost" id="diff">try a different combo</button>
+  `;
+  document.getElementById('again').onclick = () => {
+    state.phase = 'setup';
+    state.heatStart = state.heatHit = state.coolStart = state.windowEntered = null;
+    state.dabStart = state.dunkStart = state.cleanStart = null;
+    state.trim = 0; save(); render();
+  };
+  document.getElementById('diff').onclick = () => reset();
+}
+
+/* ============================================================
+   Bub click — advance phase
+   ============================================================ */
+elBub.addEventListener('click', () => {
+  let advance;
+  switch (state.phase) {
+    case 'welcome': advance = 'setup'; break;
+    case 'setup':   advance = (state.bangerId && state.concId) ? 'heat' : null; break;
+    case 'heat':    advance = 'cool'; break;
+    case 'cool':    advance = 'dab'; break;
+    case 'dab':     advance = 'dunk'; break;
+    case 'dunk':    advance = 'clean'; break;
+    case 'clean':   advance = 'done'; break;
+    default:        advance = null;
+  }
+  if (!advance) return;
+
+  if (state.phase === 'setup' && advance === 'heat') {
+    state.heatStart = Date.now(); state.heatHit = null;
+  }
+  if (state.phase === 'heat' && advance === 'cool') {
+    if (!state.heatHit) state.heatHit = Date.now();
+    state.coolStart = Date.now();
+    const t = state.targetTemp || 500;
+    state.windowFloor = t - 40;
+    state.windowCeil  = t - 10;
+  }
+  if (state.phase === 'cool' && advance === 'dab')   state.dabStart = Date.now();
+  if (state.phase === 'dab' && advance === 'dunk')   state.dunkStart = Date.now();
+  if (state.phase === 'dunk' && advance === 'clean') state.cleanStart = Date.now();
+  state.phase = advance;
+  save(); render();
+});
+
+elReset.addEventListener('click', () => {
+  if (confirm('reset the sesh and start fresh?')) reset();
+});
+
+document.getElementById('about-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  alert(`dabwith.me — a sleepy little co-pilot for your sesh.\n\nthis is a web preview. temps are simulated using newton's law of cooling — no thermometer, no bluetooth, just an honest curve based on your banger's documented heat and cool times.\n\ntap bub to skip a phase.\nstate is saved locally so you can pick up where you left off.\n\nmade with care. low and slow.`);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') {
+    const target = e.target;
+    if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return;
+    e.preventDefault();
+    elBub.click();
+  }
+});
+
+function init() { startBlinking(); render(); }
+init();
+</script>
+</body>
+</html>
