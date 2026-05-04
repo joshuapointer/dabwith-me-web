@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://dabwith.me'),
   title: 'dabwith.me — a sleepy little co-pilot for your sesh',
   description: 'A gentle web companion for your dab sesh. Pick your banger, pick your concentrate, follow the breathing orb through heat and cool. iOS, Android, and right here in the browser.',
   icons: {
