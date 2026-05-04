@@ -4,7 +4,7 @@ const config: NextConfig = {
   output: 'standalone',
   async rewrites() {
     return [
-      { source: '/',    destination: '/landing.html' },
+      { source: '/',    destination: '/index.html' },
       { source: '/app', destination: '/app.html' },
     ]
   },
